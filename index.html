@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BantayHayop BLGU | Stray Animal Reporting & Adoption System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .map-grid {
+      background-color: #ecfdf5;
+      background-image:
+        linear-gradient(to right, rgba(16, 185, 129, 0.15) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(16, 185, 129, 0.15) 1px, transparent 1px);
+      background-size: 36px 36px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Top Header & Role Switcher -->
+  <header class="bg-emerald-900 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center font-bold text-lg text-emerald-950">BH</div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight">BantayHayop BLGU Portal</h1>
+          <p class="text-xs text-emerald-200">Barangay Stray Animal Reporting, Rescue & Adoption System</p>
+        </div>
+      </div>
+
+      <!-- 3 Primary Roles -->
+      <div class="flex items-center gap-2 bg-emerald-950/60 p-1 rounded-xl border border-emerald-700">
+        <button onclick="switchRole('resident')" id="role-resident" class="role-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-emerald-950 transition">
+          Resident / Adopter
+        </button>
+        <button onclick="switchRole('responder')" id="role-responder" class="role-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-100 hover:bg-emerald-800 transition">
+          Responder / Volunteer
+        </button>
+        <button onclick="switchRole('admin')" id="role-admin" class="role-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-100 hover:bg-emerald-800 transition">
+          Barangay Admin
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div id="db-banner" class="bg-amber-100 border-b border-amber-300 text-amber-900 text-xs px-4 py-2 text-center hidden"></div>
+
+  <main class="max-w-7xl w-full mx-auto px-4 py-6 flex-1">
+
+    <!-- ==================== RESIDENT / ADOPTER ==================== -->
+    <section id="view-resident" class="space-y-6">
+      <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        <button onclick="switchResidentTab('report')" id="tab-report" class="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white">
+          1. Report Stray Sighting
+        </button>
+        <button onclick="switchResidentTab('adopt')" id="tab-adopt" class="px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-slate-300 text-slate-700">
+          2. Browse Adoptable Pets
+        </button>
+        <button onclick="switchResidentTab('tracker')" id="tab-tracker" class="px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-slate-300 text-slate-700">
+          3. Live Rescue & Adoption Status
+        </button>
+      </div>
+
+      <!-- Report Module -->
+      <div id="res-report" class="grid lg:grid-cols-2 gap-6">
+        <form id="reportForm" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-900">Submit Stray Animal Sighting</h2>
+            <span class="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-medium">Domestic Dogs & Cats Only</span>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Species *</label>
+              <select id="repSpecies" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="Dog">Dog (Aspin / Domestic)</option>
+                <option value="Cat">Cat (Puspin / Domestic)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Urgency Level *</label>
+              <select id="repUrgency" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="Normal">Normal (Roaming Stray)</option>
+                <option value="Injured">Injured / Needs Medical Aid</option>
+                <option value="Aggressive">Aggressive / Road Hazard</option>
+                <option value="Abandoned">Abandoned Litter / Puppies / Kittens</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Barangay Purok / Zone *</label>
+              <select id="repPurok" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <option value="Purok 1">Purok 1 (Main Highway)</option>
+                <option value="Purok 2">Purok 2 (Covered Court Area)</option>
+                <option value="Purok 3">Purok 3 (Elementary School Zone)</option>
+                <option value="Purok 4">Purok 4 (Chapel & Market)</option>
+                <option value="Purok 5">Purok 5 (Riverside Subdivision)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Street / Specific Landmark *</label>
+              <input id="repLandmark" type="text" required placeholder="e.g., Front of Sari-Sari Store, Rizal St." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Physical Description & Behavior *</label>
+            <textarea id="repDesc" rows="2" required placeholder="Color, size, collar presence, injury signs..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"></textarea>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Your Name *</label>
+              <input id="repName" type="text" required placeholder="Juan Dela Cruz" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Mobile Number *</label>
+              <input id="repContact" type="text" required placeholder="09XX-XXX-XXXX" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Upload Sighting Photo (Optional)</label>
+            <input id="repPhoto" type="file" accept="image/*" class="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:text-emerald-700 file:font-semibold" />
+          </div>
+
+          <button type="submit" id="repSubmitBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-sm transition">
+            Submit Sighting to Barangay Responders
+          </button>
+        </form>
+
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+          <div>
+            <h3 class="text-lg font-bold text-slate-900">Barangay Purok Geolocation Pin</h3>
+            <p class="text-xs text-slate-500">Click anywhere on the barangay map below to drop an exact sighting pin.</p>
+          </div>
+
+          <div id="barangayMap" onclick="dropPin(event)" class="map-grid relative h-72 w-full rounded-xl border-2 border-emerald-300 cursor-crosshair overflow-hidden select-none">
+            <span class="absolute top-3 left-3 text-[11px] font-bold bg-white/90 px-2 py-0.5 rounded shadow-sm text-emerald-900">Purok 1 • Highway</span>
+            <span class="absolute top-3 right-3 text-[11px] font-bold bg-white/90 px-2 py-0.5 rounded shadow-sm text-emerald-900">Purok 4 • Chapel</span>
+            <span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[11px] font-bold bg-emerald-900 text-white px-2.5 py-1 rounded shadow">Barangay Hall & Shelter</span>
+            <span class="absolute bottom-3 left-3 text-[11px] font-bold bg-white/90 px-2 py-0.5 rounded shadow-sm text-emerald-900">Purok 2 • Court</span>
+            <span class="absolute bottom-3 right-3 text-[11px] font-bold bg-white/90 px-2 py-0.5 rounded shadow-sm text-emerald-900">Purok 5 • Riverside</span>
+
+            <div id="mapPin" style="left: 50%; top: 50%;" class="absolute -translate-x-1/2 -translate-y-full transition-all duration-150">
+              <div class="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg whitespace-nowrap">📍 Sighting Pin</div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs bg-slate-100 px-3 py-2 rounded-lg">
+            <span>Selected Coordinates: <strong id="coordText">X: 50.0%, Y: 50.0%</strong></span>
+            <span class="text-slate-500">Click map to adjust</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Adoption Catalog -->
+      <div id="res-adopt" class="hidden space-y-4">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900">Rescued Animals Available for Adoption</h2>
+            <p class="text-xs text-slate-500">Note: Approved adopters settle any applicable barangay adoption/vaccination fees directly at the Barangay Hall.</p>
+          </div>
+          <div class="flex gap-2">
+            <select id="filterSpecies" onchange="renderAdoptionCatalog()" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold">
+              <option value="ALL">All Species</option>
+              <option value="Dog">Dogs Only</option>
+              <option value="Cat">Cats Only</option>
+            </select>
+            <select id="filterVax" onchange="renderAdoptionCatalog()" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold">
+              <option value="ALL">All Health Status</option>
+              <option value="VAX">Anti-Rabies Vaccinated</option>
+              <option value="FIXED">Spayed / Neutered</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="adoptionGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      </div>
+
+      <!-- Public Tracker -->
+      <div id="res-tracker" class="hidden grid lg:grid-cols-2 gap-6">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 space-y-3">
+          <h3 class="font-bold text-slate-900">Community Stray Rescue Status</h3>
+          <div id="publicRescueList" class="space-y-3"></div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 space-y-3">
+          <h3 class="font-bold text-slate-900">Submitted Adoption Applications</h3>
+          <div id="publicAdoptionList" class="space-y-3"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== RESPONDER / VOLUNTEER ==================== -->
+    <section id="view-responder" class="hidden space-y-6">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Barangay Field Dispatch & Rescue Board</h2>
+          <p class="text-xs text-slate-500">Update field rescue stages in real time and log initial intake observations.</p>
+        </div>
+        <button onclick="loadAllData()" class="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+          ↻ Refresh Live Reports
+        </button>
+      </div>
+
+      <div id="responderReportsList" class="grid md:grid-cols-2 gap-4"></div>
+    </section>
+
+    <!-- ==================== BARANGAY ADMINISTRATOR ==================== -->
+    <section id="view-admin" class="hidden space-y-6">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200">
+          <p class="text-xs text-slate-500">Total Stray Reports</p>
+          <p id="kpiReports" class="text-2xl font-bold text-slate-900 mt-1">0</p>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200">
+          <p class="text-xs text-slate-500">In Holding / Shelter</p>
+          <p id="kpiShelter" class="text-2xl font-bold text-emerald-700 mt-1">0</p>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200">
+          <p class="text-xs text-slate-500">Available for Adoption</p>
+          <p id="kpiAvailable" class="text-2xl font-bold text-blue-700 mt-1">0</p>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200">
+          <p class="text-xs text-slate-500">Pending Adoptions</p>
+          <p id="kpiAdoptions" class="text-2xl font-bold text-amber-600 mt-1">0</p>
+        </div>
+      </div>
+
+      <div class="grid lg:grid-cols-2 gap-6">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 space-y-3">
+          <h3 class="font-bold text-slate-900">Adoption Screening Queue</h3>
+          <div id="adminAdoptionQueue" class="space-y-3"></div>
+        </div>
+
+        <form id="intakeForm" class="bg-white p-5 rounded-2xl border border-slate-200 space-y-3">
+          <h3 class="font-bold text-slate-900">Register Rescued Animal to Catalog</h3>
+          <div class="grid grid-cols-2 gap-3">
+            <input id="inName" type="text" required placeholder="Pet Name (e.g., Tagpi)" class="rounded-lg border border-slate-300 px-3 py-2 text-xs" />
+            <select id="inSpecies" class="rounded-lg border border-slate-300 px-3 py-2 text-xs">
+              <option value="Dog">Dog</option>
+              <option value="Cat">Cat</option>
+            </select>
+            <input id="inBreed" type="text" required placeholder="Breed (e.g., Aspin / Puspin)" class="rounded-lg border border-slate-300 px-3 py-2 text-xs" />
+            <input id="inAge" type="text" required placeholder="Est. Age (e.g., 1 Year)" class="rounded-lg border border-slate-300 px-3 py-2 text-xs" />
+            <select id="inGender" class="rounded-lg border border-slate-300 px-3 py-2 text-xs">
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+            <input id="inTemp" type="text" required placeholder="Temperament (e.g., Gentle)" class="rounded-lg border border-slate-300 px-3 py-2 text-xs" />
+          </div>
+          <input id="inNotes" type="text" placeholder="Initial health / medical notes" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs" />
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-500 mb-1">Animal Profile Photo</label>
+            <input id="inPhoto" type="file" accept="image/*" class="w-full text-xs text-slate-600" />
+          </div>
+          <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-xs font-semibold">
+            + Add Animal to Shelter Inventory
+          </button>
+        </form>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 overflow-x-auto">
+        <h3 class="font-bold text-slate-900 mb-3">Shelter Animal Inventory & Medical Logs</h3>
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr>
+              <th class="p-2.5">Name</th>
+              <th class="p-2.5">Species / Breed</th>
+              <th class="p-2.5">Anti-Rabies Vax</th>
+              <th class="p-2.5">Spay / Neuter</th>
+              <th class="p-2.5">Health Notes</th>
+              <th class="p-2.5">Status</th>
+            </tr>
+          </thead>
+          <tbody id="medicalTableBody" class="divide-y divide-slate-200"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Adoption Screening Modal -->
+  <div id="adoptModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg text-slate-900">Adopt <span id="modalPetName" class="text-emerald-700"></span></h3>
+        <button onclick="closeAdoptModal()" class="text-slate-400 hover:text-slate-700 font-bold">✕</button>
+      </div>
+      <form id="adoptForm" class="space-y-3">
+        <input type="hidden" id="modalPetId" />
+        <input id="adName" type="text" required placeholder="Full Name *" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs" />
+        <input id="adContact" type="text" required placeholder="Mobile Number *" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs" />
+        <input id="adAddress" type="text" required placeholder="Barangay Purok & Street Address *" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs" />
+        <select id="adEnv" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs">
+          <option value="Fenced Yard / House">Fenced Yard / Private House</option>
+          <option value="Indoor Apartment / Condo">Indoor Apartment / Home</option>
+          <option value="Shared Compound">Shared Family Compound</option>
+        </select>
+        <input id="adExp" type="text" required placeholder="Do you currently own other pets? *" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs" />
+        <textarea id="adNotes" rows="2" required placeholder="Why do you want to adopt this pet? *" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"></textarea>
+        <p class="text-[11px] text-amber-800 bg-amber-50 p-2 rounded-lg">
+          No online payment is collected. Applicable adoption/vaccination fees are settled directly at the Barangay Hall upon approval.
+        </p>
+        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-xs font-semibold">
+          Submit Adoption Application
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://ijfizmiwckotzhpnrfjg.supabase.co/rest/v1/';
+    const SUPABASE_ANON_KEY = 'sb_publishable_3ynZ3si2c9sJS3Zz8M_1gA_3pYRouw3';
+
+    const isConfigured = SUPABASE_URL.startsWith('http') && SUPABASE_ANON_KEY.length > 20;
+    const db = isConfigured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+    let reports = [];
+    let animals = [];
+    let adoptions = [];
+    let pinCoords = { x: 50.0, y: 50.0 };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (!isConfigured) {
+        const banner = document.getElementById('db-banner');
+        banner.textContent = '⚠️ Setup Required: Replace YOUR_SUPABASE_URL and YOUR_SUPABASE_ANON_KEY in index.html.';
+        banner.classList.remove('hidden');
+      } else {
+        loadAllData();
+      }
+    });
+
+    async function loadAllData() {
+      if (!db) return;
+      const [repRes, aniRes, adoRes] = await Promise.all([
+        db.from('stray_reports').select('*').order('created_at', { ascending: false }),
+        db.from('animals').select('*').order('created_at', { ascending: false }),
+        db.from('adoption_applications').select('*').order('created_at', { ascending: false })
+      ]);
+
+      reports = repRes.data || [];
+      animals = aniRes.data || [];
+      adoptions = adoRes.data || [];
+      renderAll();
+    }
+
+    async function uploadImage(file) {
+  if (!file || !db) return null;
+
+  // Extract extension safely and sanitize base name to letters, numbers, and underscores only
+  const parts = file.name.split('.');
+  const ext = parts.length > 1 ? parts.pop().toLowerCase().replace(/[^a-z0-9]/g, '') : 'jpg';
+  const baseName = parts.join('.').replace(/[^a-zA-Z0-9_-]/g, '_').replace(/^_+|_+$/g, '') || 'photo';
+  const fileName = `reports/${Date.now()}_${baseName}.${ext || 'jpg'}`;
+
+  const { error } = await db.storage
+    .from('stray-photos')
+    .upload(fileName, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || 'image/jpeg'
+    });
+
+  if (error) {
+    alert('Photo upload error: ' + error.message);
+    return null;
+  }
+
+  const { data } = db.storage.from('stray-photos').getPublicUrl(fileName);
+  return data.publicUrl;
+}
+    
+
+    document.getElementById('reportForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!db) return alert('Please add your Supabase credentials first.');
+      const btn = document.getElementById('repSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Submitting Report...';
+
+const file = document.getElementById('repPhoto').files[0];
+let photoUrl = null;
+if (file) {
+  photoUrl = await uploadImage(file);
+  if (!photoUrl) {
+    btn.disabled = false;
+    btn.textContent = 'Submit Sighting to Barangay Responders';
+    return;
+  }
+}
+
+      const payload = {
+        species: document.getElementById('repSpecies').value,
+        urgency: document.getElementById('repUrgency').value,
+        purok: document.getElementById('repPurok').value,
+        street_landmark: document.getElementById('repLandmark').value,
+        map_x: pinCoords.x,
+        map_y: pinCoords.y,
+        description: document.getElementById('repDesc').value,
+        reporter_name: document.getElementById('repName').value,
+        reporter_contact: document.getElementById('repContact').value,
+        photo_url: photoUrl,
+        status: 'Reported'
+      };
+
+      const { error } = await db.from('stray_reports').insert([payload]);
+      btn.disabled = false;
+      btn.textContent = 'Submit Sighting to Barangay Responders';
+
+      if (error) return alert('Error: ' + error.message);
+      e.target.reset();
+      alert('Stray sighting submitted!');
+      await loadAllData();
+      switchResidentTab('tracker');
+    });
+
+    async function updateReportStatus(id, newStatus) {
+      const notes = document.getElementById(`notes-${id}`)?.value || '';
+      const { error } = await db.from('stray_reports').update({ status: newStatus, intake_notes: notes }).eq('id', id);
+      if (error) return alert('Update failed: ' + error.message);
+      await loadAllData();
+    }
+
+    document.getElementById('adoptForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!db) return alert('Please add your Supabase credentials first.');
+      const animalId = Number(document.getElementById('modalPetId').value);
+      const animalName = document.getElementById('modalPetName').textContent;
+
+      const payload = {
+        animal_id: animalId,
+        animal_name: animalName,
+        applicant_name: document.getElementById('adName').value,
+        applicant_contact: document.getElementById('adContact').value,
+        purok_address: document.getElementById('adAddress').value,
+        living_environment: document.getElementById('adEnv').value,
+        pet_experience: document.getElementById('adExp').value,
+        readiness_notes: document.getElementById('adNotes').value
+      };
+
+      const { error } = await db.from('adoption_applications').insert([payload]);
+      if (error) return alert('Error: ' + error.message);
+      e.target.reset();
+      closeAdoptModal();
+      alert('Adoption application submitted!');
+      await loadAllData();
+      switchResidentTab('tracker');
+    });
+
+    async function updateAdoption(appId, animalId, decision) {
+      await db.from('adoption_applications').update({ status: decision }).eq('id', appId);
+      if (decision.startsWith('Approved')) {
+        await db.from('animals').update({ adoption_status: 'Adopted' }).eq('id', animalId);
+      }
+      await loadAllData();
+    }
+
+    async function toggleMedical(id, field, currentValue) {
+      await db.from('animals').update({ [field]: !currentValue }).eq('id', id);
+      await loadAllData();
+    }
+
+    document.getElementById('intakeForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!db) return alert('Please add your Supabase credentials first.');
+      const file = document.getElementById('inPhoto').files[0];
+      const photoUrl = await uploadImage(file);
+
+      const payload = {
+        name: document.getElementById('inName').value,
+        species: document.getElementById('inSpecies').value,
+        breed: document.getElementById('inBreed').value,
+        estimated_age: document.getElementById('inAge').value,
+        gender: document.getElementById('inGender').value,
+        temperament: document.getElementById('inTemp').value,
+        health_notes: document.getElementById('inNotes').value || 'Cleared at barangay intake.'
+      };
+      if (photoUrl) payload.photo_url = photoUrl;
+
+      const { error } = await db.from('animals').insert([payload]);
+      if (error) return alert('Error: ' + error.message);
+      e.target.reset();
+      await loadAllData();
+    });
+
+    function dropPin(e) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = Math.max(5, Math.min(95, ((e.clientX - rect.left) / rect.width) * 100)).toFixed(1);
+      const y = Math.max(10, Math.min(95, ((e.clientY - rect.top) / rect.height) * 100)).toFixed(1);
+      pinCoords = { x: Number(x), y: Number(y) };
+      const pin = document.getElementById('mapPin');
+      pin.style.left = `${x}%`;
+      pin.style.top = `${y}%`;
+      document.getElementById('coordText').textContent = `X: ${x}%, Y: ${y}%`;
+    }
+
+    function renderAll() {
+      renderAdoptionCatalog();
+      renderTrackers();
+      renderResponderBoard();
+      renderAdminPanel();
+    }
+
+    function renderAdoptionCatalog() {
+      const spFilter = document.getElementById('filterSpecies').value;
+      const vaxFilter = document.getElementById('filterVax').value;
+      const grid = document.getElementById('adoptionGrid');
+
+      const filtered = animals.filter(a => {
+        if (spFilter !== 'ALL' && a.species !== spFilter) return false;
+        if (vaxFilter === 'VAX' && !a.anti_rabies) return false;
+        if (vaxFilter === 'FIXED' && !a.spayed_neutered) return false;
+        return true;
+      });
+
+      grid.innerHTML = filtered.map(a => `
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+          <img src="${a.photo_url || 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=600&q=80'}" class="h-48 w-full object-cover" />
+          <div class="p-4 flex-1 flex flex-col justify-between space-y-3">
+            <div>
+              <div class="flex justify-between items-center">
+                <h3 class="font-bold text-base text-slate-900">${a.name}</h3>
+                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full ${a.adoption_status === 'Available' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}">${a.adoption_status}</span>
+              </div>
+              <p class="text-xs text-slate-500">${a.species} • ${a.breed} • ${a.estimated_age} • ${a.gender}</p>
+              <p class="text-xs text-slate-700 mt-2">${a.temperament}</p>
+              <div class="flex flex-wrap gap-1.5 mt-2">
+                <span class="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold">${a.anti_rabies ? '✓ Anti-Rabies Vax' : 'Pending Vax'}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold">${a.spayed_neutered ? '✓ Spayed/Neutered' : 'Intact'}</span>
+              </div>
+            </div>
+            <button ${a.adoption_status !== 'Available' ? 'disabled' : ''} onclick="openAdoptModal(${a.id}, '${a.name}')"
+              class="w-full py-2 rounded-xl text-xs font-semibold ${a.adoption_status === 'Available' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}">
+              ${a.adoption_status === 'Available' ? 'Apply to Adopt' : 'Already Adopted'}
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderTrackers() {
+      document.getElementById('publicRescueList').innerHTML = reports.map(r => `
+        <div class="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs space-y-1">
+          <div class="flex justify-between font-bold">
+            <span>${r.species} (${r.urgency}) — ${r.purok}</span>
+            <span class="text-emerald-700">${r.status}</span>
+          </div>
+          <p class="text-slate-600">${r.street_landmark} • ${r.description}</p>
+          ${r.intake_notes ? `<p class="text-blue-700 font-medium">Responder Note: ${r.intake_notes}</p>` : ''}
+        </div>
+      `).join('') || '<p class="text-xs text-slate-400">No reports yet.</p>';
+
+      document.getElementById('publicAdoptionList').innerHTML = adoptions.map(ad => `
+        <div class="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs flex justify-between items-center">
+          <div>
+            <p class="font-bold">${ad.applicant_name} → ${ad.animal_name}</p>
+            <p class="text-slate-500">${ad.purok_address}</p>
+          </div>
+          <span class="px-2.5 py-1 rounded-full font-semibold bg-amber-100 text-amber-800">${ad.status}</span>
+        </div>
+      `).join('') || '<p class="text-xs text-slate-400">No adoption applications yet.</p>';
+    }
+
+    function renderResponderBoard() {
+      const stages = ['Reported', 'Dispatched', 'Rescued', 'In Barangay Holding/Shelter'];
+      document.getElementById('responderReportsList').innerHTML = reports.map(r => `
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-3 text-xs">
+          <div class="flex justify-between items-start">
+            <div>
+              <span class="px-2 py-0.5 rounded bg-red-100 text-red-800 font-bold">${r.urgency}</span>
+              <h4 class="font-bold text-sm mt-1">${r.species} at ${r.purok} (${r.street_landmark})</h4>
+              <p class="text-slate-500">Pin: X ${r.map_x}%, Y ${r.map_y}% • Reporter: ${r.reporter_name} (${r.reporter_contact})</p>
+            </div>
+            ${r.photo_url ? `<img src="${r.photo_url}" class="w-16 h-16 rounded-lg object-cover border" />` : ''}
+          </div>
+          <p class="text-slate-700">${r.description}</p>
+          <input id="notes-${r.id}" type="text" value="${r.intake_notes || ''}" placeholder="Field / intake notes..." class="w-full rounded-lg border border-slate-300 px-2.5 py-1.5" />
+          <div class="flex flex-wrap gap-1.5">
+            ${stages.map(st => `
+              <button onclick="updateReportStatus(${r.id}, '${st}')"
+                class="px-2.5 py-1 rounded-lg font-semibold border ${r.status === st ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'}">
+                ${st}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderAdminPanel() {
+      document.getElementById('kpiReports').textContent = reports.length;
+      document.getElementById('kpiShelter').textContent = reports.filter(r => r.status === 'In Barangay Holding/Shelter').length;
+      document.getElementById('kpiAvailable').textContent = animals.filter(a => a.adoption_status === 'Available').length;
+      document.getElementById('kpiAdoptions').textContent = adoptions.filter(a => a.status === 'Under Screening').length;
+
+      document.getElementById('adminAdoptionQueue').innerHTML = adoptions.map(ad => `
+        <div class="p-3 rounded-xl border border-slate-200 text-xs space-y-2">
+          <div class="flex justify-between font-bold">
+            <span>${ad.applicant_name} (${ad.applicant_contact}) — Pet: ${ad.animal_name}</span>
+            <span class="text-amber-700">${ad.status}</span>
+          </div>
+          <p class="text-slate-600">${ad.purok_address} • ${ad.living_environment} • Pets: ${ad.pet_experience}</p>
+          <p class="text-slate-500 italic">"${ad.readiness_notes}"</p>
+          <div class="flex gap-2">
+            <button onclick="updateAdoption(${ad.id}, ${ad.animal_id}, 'Approved - Visit Barangay Hall')" class="px-3 py-1 rounded-lg bg-emerald-600 text-white font-semibold">Approve</button>
+            <button onclick="updateAdoption(${ad.id}, ${ad.animal_id}, 'Declined')" class="px-3 py-1 rounded-lg bg-red-100 text-red-700 font-semibold">Decline</button>
+          </div>
+        </div>
+      `).join('') || '<p class="text-xs text-slate-400">No applications in queue.</p>';
+
+      document.getElementById('medicalTableBody').innerHTML = animals.map(a => `
+        <tr>
+          <td class="p-2.5 font-bold">${a.name}</td>
+          <td class="p-2.5">${a.species} (${a.breed})</td>
+          <td class="p-2.5">
+            <button onclick="toggleMedical(${a.id}, 'anti_rabies', ${a.anti_rabies})" class="px-2 py-0.5 rounded font-semibold ${a.anti_rabies ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}">
+              ${a.anti_rabies ? 'Vaccinated' : 'Unvaccinated'}
+            </button>
+          </td>
+          <td class="p-2.5">
+            <button onclick="toggleMedical(${a.id}, 'spayed_neutered', ${a.spayed_neutered})" class="px-2 py-0.5 rounded font-semibold ${a.spayed_neutered ? 'bg-purple-100 text-purple-800' : 'bg-slate-200 text-slate-600'}">
+              ${a.spayed_neutered ? 'Yes' : 'No'}
+            </button>
+          </td>
+          <td class="p-2.5 text-slate-600">${a.health_notes}</td>
+          <td class="p-2.5 font-semibold">${a.adoption_status}</td>
+        </tr>
+      `).join('');
+    }
+
+    function switchRole(role) {
+      ['resident', 'responder', 'admin'].forEach(r => {
+        document.getElementById(`view-${r}`).classList.toggle('hidden', r !== role);
+        const btn = document.getElementById(`role-${r}`);
+        btn.className = r === role
+          ? 'role-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500 text-emerald-950 transition'
+          : 'role-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-100 hover:bg-emerald-800 transition';
+      });
+    }
+
+    function switchResidentTab(tab) {
+      ['report', 'adopt', 'tracker'].forEach(t => {
+        document.getElementById(`res-${t}`).classList.toggle('hidden', t !== tab);
+        document.getElementById(`tab-${t}`).className = t === tab
+          ? 'px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white'
+          : 'px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-slate-300 text-slate-700';
+      });
+    }
+
+    function openAdoptModal(id, name) {
+      document.getElementById('modalPetId').value = id;
+      document.getElementById('modalPetName').textContent = name;
+      document.getElementById('adoptModal').classList.remove('hidden');
+      document.getElementById('adoptModal').classList.add('flex');
+    }
+
+    function closeAdoptModal() {
+      document.getElementById('adoptModal').classList.add('hidden');
+      document.getElementById('adoptModal').classList.remove('flex');
+    }
+  </script>
+</body>
+</html>
