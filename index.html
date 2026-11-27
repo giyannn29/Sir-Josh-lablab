@@ -313,7 +313,7 @@
 
   <script>
     const SUPABASE_URL = 'https://ijfizmiwckotzhpnrfjg.supabase.co/rest/v1/';
-    const SUPABASE_ANON_KEY = 'sb_publishable_3ynZ3si2c9sJS3Zz8M_1gA_3pYRouw3';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqZml6bWl3Y2tvdHpocG5yZmpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU3NjAxNzIsImV4cCI6MjExMTMzNjE3Mn0.WcxNYqT8qgCaTqeuJclEOURtxgsPBT55VSELDjHEJMQ';
 
     const isConfigured = SUPABASE_URL.startsWith('http') && SUPABASE_ANON_KEY.length > 20;
     const db = isConfigured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
